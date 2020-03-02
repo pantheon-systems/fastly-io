@@ -7,14 +7,15 @@
 
 /**
  * WordPress Image Editor Class for Fastly IO-enabled sites
+ * Based on the GD image editor
  */
 
 namespace Fastly_IO;
 
 use \WP_Error;
-use \WP_Image_Editor;
+use \WP_Image_Editor_GD;
 
-class WP_Image_Editor_Fastly extends WP_Image_Editor
+class WP_Image_Editor_Fastly extends WP_Image_Editor_GD
 {
 
     /**
@@ -31,41 +32,20 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
      */
     protected $ioQsParams = [];
 
-    public function __destruct()
-    {
-        if ($this->image) {
-            imagedestroy($this->image);
-        }
-    }
-
     /**
      * Checks to see if the current environment supports this service.
-     * Assumes "yes" if it's installed
+     * Can do everything GD can but can also rotate, so override this method.
      *
      * @param array $args
      * @return bool
      */
     public static function test($args = [])
     {
-        return true;
-    }
-
-    /**
-     * Checks to see if the editor supports the mime type specified.
-     *
-     * @param string $mime_type
-     * @return bool
-     */
-    public static function supports_mime_type($mime_type)
-    {
-        switch ($mime_type) {
-            case 'image/jpeg':
-            case 'image/png':
-            case 'image/gif':
-                return true;
-            default:
-                return false;
+        if (! \extension_loaded('gd') || ! \function_exists('gd_info')) {
+            return false;
         }
+
+        return true;
     }
 
     /**
@@ -79,22 +59,26 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
             return true;
         }
 
-        if (! is_file($this->file) && ! preg_match('|^https?://|', $this->file)) {
+        if (! \is_file($this->file) && ! \preg_match('|^https?://|', $this->file)) {
             return new WP_Error('error_loading_image', __('File doesn&#8217;t exist?'), $this->file);
         }
 
-        wp_raise_memory_limit('image');
+        // So we're NOT going to do this for now; instead, we'll lazy load
+        // $this->image only if someone requires that resource be available.
+        // wp_raise_memory_limit('image');
+        // $this->image = @imagecreatefromstring(file_get_contents($this->file));
 
-        $this->image = @imagecreatefromstring(file_get_contents($this->file));
-
-        if (! is_resource($this->image)) {
-            return new WP_Error('invalid_image', __('File is not an image.'), $this->file);
-        }
+        // if (! is_resource($this->image)) {
+        //     return new WP_Error('invalid_image', __('File is not an image.'), $this->file);
+        // }
 
         $size = @getimagesize($this->file);
         if (! $size) {
             return new WP_Error('invalid_image', __('Could not read image size.'), $this->file);
         }
+
+        // Only difference between this and the parent is that we're not doing
+        // any "imagealphablending" or "imagesavealpha" calls here.
 
         $this->update_size($size[0], $size[1]);
         $this->mime_type = $size['mime'];
@@ -112,7 +96,7 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
      */
     public function save($filename = null, $mime_type = null)
     {
-        $saved = $this->_save($this->image, $filename, $mime_type);
+        $saved = $this->_save(null, $filename, $mime_type);
         $this->file = $saved['path'];
         $this->mime_type = $saved['mime-type'];
         return $saved;
@@ -165,53 +149,12 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
     }
 
     /**
-     * Create an image sub-size and return the image meta data value for it.
-     *
-     * @param array $size_data
-     * @return WP_Error|array
-     */
-    public function make_subsize($size_data)
-    {
-        if (! isset($size_data['width']) && ! isset($size_data['height'])) {
-            return new WP_Error('image_subsize_create_error', __('Cannot resize the image. Both width and height are not set.'));
-        }
-
-        $orig_size = $this->size;
-        if (! isset($size_data['width'])) {
-            $size_data['width'] = null;
-        }
-        if (! isset($size_data['height'])) {
-            $size_data['height'] = null;
-        }
-        if (!isset($size_data['crop'])) {
-            $size_data['crop'] = false;
-        }
-
-        $resized = $this->_resize($size_data['width'], $size_data['height'], $size_data['crop']);
-
-        if (is_wp_error($resized)) {
-            $saved = $resized;
-        } else {
-            $saved = $this->_save($resized);
-            imagedestroy($resized);
-        }
-
-        $this->size = $orig_size;
-
-        if (! is_wp_error($saved)) {
-            unset($saved['path']);
-        }
-
-        return $saved;
-    }
-
-    /**
      * Simulates an image resize operation.
      *
      * @param int|null $max_w
      * @param int|null $max_h
      * @param bool $crop
-     * @return true|WP_Error
+     * @return true
      */
     public function resize($max_w, $max_h, $crop = false)
     {
@@ -220,6 +163,10 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
         }
 
         $resized = $this->_resize($max_w, $max_h, $crop);
+        
+        // The parent library would do the resize here and check if the result was
+        // an image resource. We're assuming the resize happened.
+
         return true;
     }
 
@@ -257,7 +204,7 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
     {
         $metadata = [];
         foreach ($sizes as $size => $size_data) {
-            $resized = $this->resize($size_data['width'], $size_data['height'], $size_data['crop'] ?: false);
+            $resized = $this->make_subsize($size_data);
             $metadata[$size] = [
                 'width' => $this->size['width'],
                 'height' => $this->size['height']
@@ -269,19 +216,23 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
     /**
      * Simulate a crop operation. Not currently supported.
      *
-     * @param int $src_x
-     * @param int $src_y
-     * @param int $src_w
-     * @param int $src_h
-     * @param int|null $dst_w
-     * @param int|null $dst_h
-     * @param bool $src_abs
+     * @param int  $src_x   The start x position to crop from.
+     * @param int  $src_y   The start y position to crop from.
+     * @param int  $src_w   The width to crop.
+     * @param int  $src_h   The height to crop.
+     * @param int  $dst_w   Optional. The destination width.
+     * @param int  $dst_h   Optional. The destination height.
+     * @param bool $src_abs Optional. If the source crop points are absolute.
      * @return true
      */
     public function crop($src_x, $src_y, $src_w, $src_h, $dst_w = null, $dst_h = null, $src_abs = false)
     {
-        // TODO:
-        return true;
+        // TODO: add the cropping parameters as a query string.
+        // return true;
+
+        // For now, though, use the underlying GD crop feature.
+        $this->populateImage();
+        return parent::crop($src_x, $src_y, $src_w, $src_h, $dst_w, $dst_h, $src_abs);
     }
 
     /**
@@ -299,17 +250,17 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
                     $this->ioQsParams['orient'] = 'r';
                     $dst_h = $src_w;
                     $dst_w = $src_h;
-                break;
+                    break;
                 case 180:
                     $this->ioQsParams['orient'] = '3';
                     $dst_h = $src_h;
                     $dst_w = $src_w;
-                break;
+                    break;
                 case 270:
                     $this->ioQsParams['orient'] = 'l';
                     $dst_h = $src_w;
                     $dst_w = $src_h;
-                break;
+                    break;
                 default:
                     $dst_h = $src_h;
                     $dst_w = $src_w;
@@ -317,11 +268,14 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
             }
             $this->update_size($dst_w, $dst_h);
         } else {
-            return new WP_Error(
-                'image_rotate_error',
-                __('Fastly IO can only rotate in 90-degree increments.'),
-                $this->file
-            );
+            // Rather than not rotating, let's let GD try.
+            // return new WP_Error(
+            //     'image_rotate_error',
+            //     __('Fastly IO can only rotate in 90-degree increments.'),
+            //     $this->file
+            // );
+            $this->populateImage();
+            return parent::rotate($angle);
         }
 
         return true;
@@ -348,29 +302,6 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
     }
 
     /**
-     * Stream the contents of $this->image back to the browser.
-     *
-     * @param string|null $mime_type
-     * @return bool
-     */
-    public function stream($mime_type = null)
-    {
-        list($filename, $extension, $mime_type) = $this->get_output_format(null, $mime_type);
-
-        switch ($mime_type) {
-            case 'image/png':
-                header('Content-Type: image/png');
-                return imagepng($this->image);
-            case 'image/gif':
-                header('Content-Type: image/gif');
-                return imagegif($this->image);
-            default:
-                header('Content-Type: image/jpeg');
-                return imagejpeg($this->image, null, $this->get_quality());
-        }
-    }
-
-    /**
      * Generate a filename with any IO-specific query parmameters.
      *
      * @param string|null $suffix
@@ -388,5 +319,52 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor
         }
 
         return $generated;
+    }
+
+    /**
+     * Override the GD library's handling of update_size to ensure
+     * that the image resource is created if $width or $height is empty.
+     *
+     * @param int|boolean $width
+     * @param int|boolean $height
+     * @return boolean
+     */
+    protected function update_size($width = false, $height = false)
+    {
+        // (NOT A) OR (NOT B) == NOT (A AND B)
+        if (!($width && $height)) {
+            $this->populateImage();
+        }
+        return parent::update_size($width, $height);
+    }
+
+    /**
+     * Override the GD library's handling of stream to ensure
+     * that the image resource is available.
+     *
+     * @param string $mime_type
+     * @return boolean
+     */
+    public function stream($mime_type = null)
+    {
+        $this->populateImage();
+        return parent::stream($mime_type);
+    }
+
+    /**
+     * Internal-only method to load the image into memory if necessary.
+     *
+     * @return boolean|WP_Error
+     */
+    protected function populateImage()
+    {
+        if (!$this->image) {
+            wp_raise_memory_limit('image');
+            $this->image = @imagecreatefromstring(file_get_contents($this->file));
+            if (!is_resource($this->image)) {
+                return new WP_Error('invalid_image', __('File is not an image.'), $this->file);
+            }
+        }
+        return true;
     }
 }

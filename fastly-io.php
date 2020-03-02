@@ -6,7 +6,7 @@
  * Author URI:       https://pantheon.io
  * Text Domain:      fastly-io
  * Domain Path:      /languages
- * Version:          1.0.0
+ * Version:          1.1.0
  *
  * @package          Fastly_IO
  */
