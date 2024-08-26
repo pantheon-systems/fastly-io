@@ -11,15 +11,15 @@
  * @package          Fastly_IO
  */
 
-function fastly_io_set_library($editors)
-{
+function fastly_io_set_library( $editors ) {
     // If the class doesn't exist, fall back to normal.
     if (! class_exists('Fastly_IO\WP_Image_Editor_Fastly')) {
         return $editors;
     }
 
     // Otherwise, use this one.
-    $editors = [ Fastly_IO\WP_Image_Editor_Fastly::class ];
+    array_unshift($editors, Fastly_IO\WP_Image_Editor_Fastly::class);
+
     return $editors;
 }
 
@@ -33,7 +33,7 @@ spl_autoload_register(
         $parts = explode('\\', $class);
         array_shift($parts);
         $last = array_pop($parts);
-        $last = "class-${last}.php";
+        $last = "class-{$last}.php";
         $parts[] = $last;
         $file = dirname(__FILE__) . '/src/classes/' . str_replace('_', '-', strtolower(implode('/', $parts)));
         if (file_exists($file)) {
@@ -42,5 +42,9 @@ spl_autoload_register(
     }
 );
 
-add_filter('big_image_size_threshold', '__return false;');
+if ( file_exists( 'vendor/autoload.php' ) ) {
+    require_once 'vendor/autoload.php';
+}
+
+add_filter('big_image_size_threshold', '__return_false');
 add_filter('wp_image_editors', 'fastly_io_set_library');
