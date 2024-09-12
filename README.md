@@ -1,5 +1,16 @@
+# Fastly Image I/O Integration
 
 [![Unofficial](https://img.shields.io/badge/Pantheon-Unofficial-yellow?logo=pantheon&color=FFDC28)](https://pantheon.io/docs/oss-support-levels#unofficial)
+
+## Installation
+
+Install and activate the plugin following typical processes
+
+After installation, regenerate the thumbnails for all images
+
+```bash
+wp media regenerate --yes
+```
 
 ## Running tests
 
