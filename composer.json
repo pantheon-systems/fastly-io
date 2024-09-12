@@ -15,6 +15,7 @@
         "yoast/phpunit-polyfills": "^2.0"
     },
     "scripts": {
+        "test-init": "bin/install-wp-tests.sh wordpress_tests root \"\"",
         "test": "phpunit"
     }
 }
