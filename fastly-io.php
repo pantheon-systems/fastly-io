@@ -46,5 +46,4 @@ if ( file_exists( 'vendor/autoload.php' ) ) {
     require_once 'vendor/autoload.php';
 }
 
-add_filter('big_image_size_threshold', '__return_false');
 add_filter('wp_image_editors', 'fastly_io_set_library');
