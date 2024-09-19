@@ -119,7 +119,7 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor_GD
             $params['crop'] = sprintf('%d:%d', $new_dims[4] / $gcd, $new_dims[5] / $gcd);
         }
 
-        $small_file = add_query_arg($params, $this->file);
+        $small_file = add_query_arg( $params, basename( $this->file ) );
 
         $data = [
             'file'   => $small_file,
