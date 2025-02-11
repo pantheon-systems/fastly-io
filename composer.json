@@ -17,5 +17,10 @@
     "scripts": {
         "test-init": "bin/install-wp-tests.sh wordpress_tests root \"\"",
         "test": "phpunit"
+    },
+    "autoload": {
+        "psr-4": {
+            "Fastly_IO\\": "src/classes/"
+        }
     }
 }
