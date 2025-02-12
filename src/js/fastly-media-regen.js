@@ -11,7 +11,8 @@ jQuery(document).ready(function ($) {
             type: 'POST',
             data: {
                 action: 'fastly_media_regen',
-                nonce: fastlyMediaRegen.nonce
+                nonce: fastlyMediaRegen.nonce,
+                selected_sites: $('#fastly-media-regen-sites').val()
             },
             success: function (response) {
                 if (response.success) {

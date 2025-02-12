@@ -9,22 +9,52 @@ class FastlyMediaRegenAdmin
     public function __construct()
     {
         add_action('admin_menu', [$this, 'add_admin_page']);
+        add_action('network_admin_menu', [$this, 'add_network_admin_page']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_scripts']);
         add_action('wp_ajax_fastly_media_regen', [$this, 'handle_ajax_request']);
     }
 
     /**
-     * Adds the admin page under Tools.
+     * Adds the admin page in the correct location.
      */
     public function add_admin_page()
     {
-        add_submenu_page(
-            'tools.php',
+        if (is_multisite()) {
+            return; // Only add in the network admin if multisite
+        }
+
+        add_menu_page(
             'Fastly Media Regen',
             'Fastly Media Regen',
             'manage_options',
             'fastly-media-regen',
-            [$this, 'render_admin_page']
+            [$this, 'render_admin_page'],
+            'dashicons-images-alt2', // Media-related Dashicon
+            25
+        );
+    }
+
+    /**
+     * Adds the network admin menu for multisite installations.
+     */
+    public function add_network_admin_page()
+    {
+        if (!is_multisite()) {
+            return; // Only add in network admin if multisite
+        }
+
+        if (!current_user_can('manage_network')) {
+            return; // Restrict to super admins
+        }
+
+        add_menu_page(
+            'Fastly Media Regen',
+            'Fastly Media Regen',
+            'manage_network',
+            'fastly-media-regen',
+            [$this, 'render_admin_page'],
+            'dashicons-images-alt2', // Media-related Dashicon
+            25
         );
     }
 
@@ -33,7 +63,7 @@ class FastlyMediaRegenAdmin
      */
     public function enqueue_scripts($hook)
     {
-        if ($hook !== 'tools_page_fastly-media-regen') {
+        if ($hook !== 'toplevel_page_fastly-media-regen' && $hook !== 'settings_page_fastly-media-regen') {
             return;
         }
 
@@ -47,7 +77,10 @@ class FastlyMediaRegenAdmin
 
         wp_localize_script('fastly-media-regen-js', 'fastlyMediaRegen', [
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce'    => wp_create_nonce('fastly_media_regen_nonce')
+            'nonce'    => wp_create_nonce('fastly_media_regen_nonce'),
+            'site_url' => get_site_url(),
+            'is_multisite' => is_multisite(),
+            'sites' => is_multisite() ? get_sites(['fields' => 'id,url']) : []
         ]);
     }
 
@@ -60,6 +93,18 @@ class FastlyMediaRegenAdmin
         <div class="wrap">
             <h1>Fastly Media Regeneration</h1>
             <p>Click the button below to regenerate all images.</p>
+            <?php if (is_multisite()) : ?>
+                <label for="fastly-media-regen-sites">Select Subsites:</label>
+                <select id="fastly-media-regen-sites" name="selected_sites" multiple style="width:100%;">
+                    <?php foreach (get_sites(['fields' => 'ids']) as $site_id) : ?>
+                        <?php $site_details = get_blog_details($site_id); ?>
+                        <option value="<?php echo esc_attr($site_id); ?>">
+                            <?php echo "(" . $site_id . ") " . esc_html($site_details->blogname . ' (' . $site_details->siteurl . ')'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <br>
+            <?php endif; ?>
             <button id="fastly-media-regen-btn" class="button button-primary">Regenerate Media</button>
             <p>&nbsp;</p>
             <p><strong>Output:</strong></p>
@@ -71,28 +116,30 @@ class FastlyMediaRegenAdmin
     /**
      * Handles AJAX request to run the regeneration.
      */
-   /**
- * Handles AJAX request to run the regeneration.
- */
-public function handle_ajax_request()
-{
-    check_ajax_referer('fastly_media_regen_nonce', 'nonce');
+    public function handle_ajax_request()
+    {
+        check_ajax_referer('fastly_media_regen_nonce', 'nonce');
 
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error('Unauthorized', 403);
+        $selected_sites = isset($_POST['selected_sites']) ? array_map('intval', $_POST['selected_sites']) : [];
+        $output = "";
+
+        if (is_multisite() && !empty($selected_sites)) {
+            foreach ($selected_sites as $site_id) {
+               $command = 'wp fastlyio media regenerate --blogid=' . $site_id . ' 2>&1';
+               $output .= "\nRunning on Site ID: $site_id\n" . shell_exec($command);
+            }
+        } else {
+            $command = 'wp fastlyio media regenerate';
+            $command .= ' 2>&1';
+            $output = shell_exec($command);
+        }
+
+        if (!$output) {
+            wp_send_json_error(['message' => 'WP-CLI command failed to execute.']);
+        } else {
+            wp_send_json_success(['output' => $output]);
+        }
     }
-
-    // Run WP-CLI command via shell_exec (Make sure WP-CLI is available in system path)
-    $command = 'wp fastlyio media regenerate --allow-root 2>&1';
-    $output = shell_exec($command);
-
-    if (!$output) {
-        wp_send_json_error(['message' => 'WP-CLI command failed to execute.']);
-    } else {
-        wp_send_json_success(['output' => $output]);
-    }
-}
-
 }
 
 new FastlyMediaRegenAdmin();
