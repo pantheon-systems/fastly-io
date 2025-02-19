@@ -43,7 +43,7 @@ class Image_Editor_Test extends WP_UnitTestCase {
 				$this->assertFileDoesNotExist( $file_subpath, 'The thumbnail was locally created' );
 
 				$query_str = parse_url( $meta['sizes'][ $size ]['file'], PHP_URL_QUERY );
-				$params = \wp_parse_args( $query_str );
+				$params    = \wp_parse_args( $query_str );
 
 				// If width is non-zero, test they're equal.
 				if ( $size_data['width'] ) {
