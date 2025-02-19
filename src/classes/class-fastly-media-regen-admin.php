@@ -95,7 +95,7 @@ class FastlyMediaRegenAdmin
             <p>Click the button below to regenerate all images.</p>
             <?php if (is_multisite()) : ?>
                 <label for="fastly-media-regen-sites">Select Subsites:</label>
-                <select id="fastly-media-regen-sites" name="selected_sites" multiple style="width:100%;">
+                <select id="fastly-media-regen-sites" name="selected_sites" multiple style="width:100%; display:block; max-width: none;">
                     <?php foreach (get_sites(['fields' => 'ids']) as $site_id) : ?>
                         <?php $site_details = get_blog_details($site_id); ?>
                         <option value="<?php echo esc_attr($site_id); ?>">
@@ -103,8 +103,11 @@ class FastlyMediaRegenAdmin
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <br>
+                <br />
             <?php endif; ?>
+            <label for="image-batch-size">Image Batch Size (default - 50):</label>
+            <input type="text" id="image-batch-size" size="5" value="50">
+            <br />
             <button id="fastly-media-regen-btn" class="button button-primary">Regenerate Media</button>
             <p>&nbsp;</p>
             <p><strong>Output:</strong></p>
@@ -119,27 +122,32 @@ class FastlyMediaRegenAdmin
     public function handle_ajax_request()
     {
         check_ajax_referer('fastly_media_regen_nonce', 'nonce');
-
-        $selected_sites = isset($_POST['selected_sites']) ? array_map('intval', $_POST['selected_sites']) : [];
-        $output = "";
-
-        if (is_multisite() && !empty($selected_sites)) {
-            foreach ($selected_sites as $site_id) {
-               $command = 'wp fastlyio media regenerate --blogid=' . $site_id . ' 2>&1';
-               $output .= "\nRunning on Site ID: $site_id\n" . shell_exec($command);
-            }
-        } else {
-            $command = 'wp fastlyio media regenerate';
-            $command .= ' 2>&1';
-            $output = shell_exec($command);
+    
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Unauthorized.']);
         }
+    
+        $selected_sites = isset($_POST['selected_sites']) ? array_map('intval', $_POST['selected_sites']) : [];    
+   
+        $response = wp_remote_post(admin_url('admin-ajax.php?action=fastly_media_regen_background'), [
+            'method'    => 'POST',
+            'body'      => [
+                'action'        => 'fastly_media_regen_background', 
+                'selected_sites' => json_encode($selected_sites),
+                'nonce'          => wp_create_nonce('fastly_media_regen_nonce') 
+            ],
+            'timeout'   => 0.01,
+            'blocking'  => false,
+            'headers'   => [
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ],
+        ]);
+        
+   
 
-        if (!$output) {
-            wp_send_json_error(['message' => 'WP-CLI command failed to execute.']);
-        } else {
-            wp_send_json_success(['output' => $output]);
-        }
     }
+    
+    
 }
 
 new FastlyMediaRegenAdmin();

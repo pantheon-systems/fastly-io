@@ -2,62 +2,21 @@
 
 [![Unofficial](https://img.shields.io/badge/Pantheon-Unofficial-yellow?logo=pantheon&color=FFDC28)](https://pantheon.io/docs/oss-support-levels#unofficial)
 
-## Installation
+## Overview
 
-Install and activate the plugin following typical processes
+This WordPress plugin eliminates image derivatives stored in the filesystem, instead rendering them using the [Fastly IO service](https://www.fastly.com/documentation/reference/io/). This reduction will result in a drastically reduced overall filesystem size by a factor of 3-10 (depending on the overall amount of uploads).
 
-After installation, regenerate the thumbnails for all images
+## Requirements
 
-```bash
-wp media regenerate --yes
-```
+* WordPress (recommended to be latest version)
+* PHP 7.4+ (recommended - 8.1+)
+* Site routing through Fastly Command
+* Fastly IO service enabled
 
-## Running tests
-
-Install MariaDB and SVN if you don't already have it
-
-```bash
-brew install mariadb svn
-```
-
-Make sure you're running PHP with mysql, gd, gd-jpeg, and gd-webp support. If you're using phpbrew, a command like below will install the right package of PHP.
-
-```bash
-phpbrew install 8.2.20 +default +fpm +pdo +mysql +gd +intl +openssl -- --with-jpeg --with-webp
-```
-
-Install PHP Unit
-
-```bash
-composer install
-```
-
-Initialize test environment
-
-```bash
-composer test-init
-```
-
-Run the tests
-
-```bash
-composer run test
-```
-
----
-
-# **Fastly Media Regeneration for WordPress**
-
-## **Overview**
-This WordPress plugin provides a **WP-CLI command** and an **admin interface** for regenerating media thumbnails, with full support for **multisite environments**. It integrates Fastly caching strategies to ensure media updates propagate efficiently.
 
 ---
 
 ## **Features**
-- **Custom WP-CLI Command (`wp fastlyio media regenerate`)**
-  - Supports regenerating **all media** or **specific attachments**.
-  - Allows passing a `--site` parameter to regenerate media on a **specific subsite** (via **Site ID** or **URL**).
-  - Filters out non-image attachments.
 
 - **Admin Interface**
   - Provides an **admin page** in the WordPress **Dashboard** or **Network Admin** (for multisite setups).
@@ -69,36 +28,26 @@ This WordPress plugin provides a **WP-CLI command** and an **admin interface** f
 
 ---
 
-## **Usage**
-### **WP-CLI Command**
-Run the following command to regenerate media:
+## Installation
 
-```sh
-wp fastlyio media regenerate
+This plugin may be installed by downloading the latest release, and placing in your plugins folder (`wp-content/plugins`).
+
+Alternatively, you may install it via Composer.
+
+## Post Installation Steps
+After installation, you must regenerate all thumbnails. This can be done via the native WP-CLI command, `media regenerate`. 
+
+```bash
+wp media regenerate
 ```
 
-### **Optional Parameters**
-| Parameter        | Description |
-|-----------------|-------------|
-| `--site=<site>` | Runs on a specific site. Accepts either **a Site ID** (for multisite) or **a full site URL**. |
+Alternatively, you may log into your Dashboard, and users with administrator permissions may regenerate thumbnails via the "Fastly Media Regen" menu. For multisite installs, this is found in the Network Admin, and is limited to super-admins.
 
-#### **Examples**
-- Regenerate all media:
-  ```sh
-  wp fastlyio media regenerate
-  ```
-- Regenerate media for a **specific subsite (by ID)**:
-  ```sh
-  wp fastlyio media regenerate --site=5
-  ```
-- Regenerate media for a **specific subsite (by URL)**:
-  ```sh
-  wp fastlyio media regenerate --site=https://example.com
-  ```
 
 ---
 
 ### **Admin Interface**
+
 1. **For Single-Site WordPress**
    - Navigate to **Fastly Media Regen** in the WordPress Admin Menu.
    - Click the **"Regenerate Media"** button.
@@ -111,25 +60,42 @@ wp fastlyio media regenerate
 
 ---
 
-## **Technical Details**
-- **Admin Menu Location**
-  - If **single-site**, appears in the **WordPress Admin Menu**.
-  - If **multisite**, appears in **Network Admin**, restricted to **super-admins**.
-  
-- **Media Filtering**
-  - **Only regenerates images** (skips PDFs and other attachments).
-  - Uses `wp_get_attachment_metadata()` to check for `image_meta`.
-
-- **Multisite Handling**
-  - Allows regenerating media **for a specific site** (`--site=<id|url>`).
-  - Supports regenerating media **for multiple subsites at once** via the **admin interface**.
-
----
-
 ## **Troubleshooting**
-- **Unknown parameter: `--site`**
-  - Ensure `WP_CLI\Utils\get_flag_value()` is correctly used in the CLI implementation.
   
 - **Command fails in the admin panel but works in CLI**
   - Ensure `shell_exec()` is **enabled** on the server.
   - Check that **WP-CLI is available in the system path**.
+
+---
+
+## Running Development Tests 
+
+1. Install MariaDB and SVN if you don't already have it
+
+```bash
+brew install mariadb svn
+```
+
+2. Make sure you're running PHP with mysql, gd, gd-jpeg, and gd-webp support. If you're using phpbrew, a command like below will install the right package of PHP.
+
+```bash
+phpbrew install 8.2.20 +default +fpm +pdo +mysql +gd +intl +openssl -- --with-jpeg --with-webp
+```
+
+3. Install PHP Unit
+
+```bash
+composer install
+```
+
+4. Initialize test environment
+
+```bash
+composer test-init
+```
+
+5. Run the tests
+
+```bash
+composer run test
+```
