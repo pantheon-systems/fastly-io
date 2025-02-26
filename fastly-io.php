@@ -2,7 +2,7 @@
 /**
  * Plugin Name:      Fastly IO
  * Description:      Set up Fastly Image Optimizer as an image editing library.
- * Author:           Tom Mount <tom.mount@pantheon.io>
+ * Authors:          Miriam Goldman <miriamgoldman@pantheon.io>, Ryan Hoover <ryan.hoover@pantheon.io>
  * Author URI:       https://pantheon.io
  * Text Domain:      fastly-io
  * Domain Path:      /languages
@@ -10,6 +10,13 @@
  *
  * @package          Fastly_IO
  */
+
+ /**
+  * Set up Fastly Image Optimizer as an image editing library.
+  *
+  * @param array $editors The current list of image editors.
+  * @return void
+  */
 function fastly_io_set_library( $editors ) {
 	// If the class doesn't exist, fall back to normal.
 	if ( ! class_exists( 'Fastly_IO\WP_Image_Editor_Fastly' ) ) {
@@ -21,6 +28,7 @@ function fastly_io_set_library( $editors ) {
 
 	return $editors;
 }
+add_filter( 'wp_image_editors', 'fastly_io_set_library' );
 
 spl_autoload_register(
 	function ( $class ) {
@@ -45,7 +53,7 @@ if ( file_exists( 'vendor/autoload.php' ) ) {
 	require_once 'vendor/autoload.php';
 }
 
-add_filter( 'wp_image_editors', 'fastly_io_set_library' );
+
 
 
 if ( ! class_exists( 'FastlyIO\Admin\FastlyMediaRegenAdmin' ) ) {
