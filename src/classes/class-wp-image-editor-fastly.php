@@ -112,6 +112,7 @@ class WP_Image_Editor_Fastly extends WP_Image_Editor_GD
         $params = [
             'width'  => $new_dims[4],
             'height' => $new_dims[4],
+            'fit'    => 'bounds',
         ];
 
         if ($size_data['crop']) {
